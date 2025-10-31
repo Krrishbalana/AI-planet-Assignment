@@ -62,6 +62,7 @@ class ApiClient {
     user_id: string;
     nodes: any[];
     edges: any[];
+    is_valid?: boolean;
   }) {
     return this.request<{ id: string; message: string }>("/api/workflows", {
       method: "POST",

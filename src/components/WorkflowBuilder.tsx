@@ -178,6 +178,7 @@ export const WorkflowBuilder = () => {
           user_id: userId,
           nodes: apiNodes,
           edges: apiEdges,
+          is_valid: true,
         });
         setWorkflowId(response.id);
         toast.success('Workflow saved successfully!');

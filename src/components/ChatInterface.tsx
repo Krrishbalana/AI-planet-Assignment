@@ -2,6 +2,7 @@ import { useState } from "react";
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
@@ -84,15 +85,23 @@ export const ChatInterface = ({
       }
     } catch (error) {
       console.error("Chat error:", error);
-      toast.error(
-        error instanceof Error
-          ? error.message
-          : "Failed to send message. Make sure the backend is running."
-      );
+      const errorMsg = error instanceof Error ? error.message : "An error occurred";
+      
+      // Better error messages based on error type
+      let userFriendlyMessage = "Sorry, I encountered an error.";
+      if (errorMsg.includes("Workflow not found")) {
+        userFriendlyMessage = "Workflow not found. Please save your workflow by clicking 'Build Stack' first.";
+      } else if (errorMsg.includes("Workflow is not valid")) {
+        userFriendlyMessage = "Your workflow needs to be validated. Please click 'Build Stack' to validate and save your workflow before chatting.";
+      } else if (errorMsg.includes("Failed to fetch")) {
+        userFriendlyMessage = "Cannot connect to backend server. Please make sure it's running on port 8000.";
+      }
+      
+      toast.error(errorMsg);
       const errorMessage: Message = {
         id: (Date.now() + 1).toString(),
         role: "assistant",
-        content: "Sorry, I encountered an error. Please make sure the backend server is running on port 8000.",
+        content: userFriendlyMessage,
         timestamp: new Date(),
       };
       setMessages((prev) => [...prev, errorMessage]);
@@ -106,6 +115,9 @@ export const ChatInterface = ({
       <DialogContent className="max-w-2xl h-[600px] flex flex-col p-0">
         <DialogHeader className="px-6 py-4 border-b border-border">
           <DialogTitle>Chat with Workflow</DialogTitle>
+          <DialogDescription>
+            Ask questions about your documents and get AI-powered responses
+          </DialogDescription>
         </DialogHeader>
 
         <ScrollArea className="flex-1 px-6">
