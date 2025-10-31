@@ -5,7 +5,8 @@ PostgreSQL connection using SQLAlchemy
 from sqlalchemy import create_engine, Column, String, Integer, Float, Boolean, Text, DateTime, JSON, ForeignKey
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker, relationship
-from sqlalchemy.dialects.postgresql import UUID
+from sqlalchemy.types import TypeDecorator, CHAR
+from sqlalchemy.dialects.postgresql import UUID as PG_UUID
 import uuid
 from datetime import datetime
 import os
@@ -40,12 +41,45 @@ def get_engine_info() -> str:
     else:
         return f"Database connected"
 
+# UUID type that works with both SQLite and PostgreSQL
+class GUID(TypeDecorator):
+    """Platform-independent GUID type.
+    Uses PostgreSQL's UUID type, otherwise uses CHAR(36), storing as stringified hex values.
+    """
+    impl = CHAR
+    cache_ok = True
+
+    def load_dialect_impl(self, dialect):
+        if dialect.name == 'postgresql':
+            return dialect.type_descriptor(PG_UUID())
+        else:
+            return dialect.type_descriptor(CHAR(36))
+
+    def process_bind_param(self, value, dialect):
+        if value is None:
+            return value
+        elif dialect.name == 'postgresql':
+            return str(value)
+        else:
+            if not isinstance(value, uuid.UUID):
+                return str(uuid.UUID(value))
+            else:
+                return str(value)
+
+    def process_result_value(self, value, dialect):
+        if value is None:
+            return value
+        else:
+            if not isinstance(value, uuid.UUID):
+                return uuid.UUID(value)
+            return value
+
 # Database Models
 class Workflow(Base):
     __tablename__ = "workflows"
     
-    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    user_id = Column(UUID(as_uuid=True), nullable=False)
+    id = Column(GUID(), primary_key=True, default=uuid.uuid4)
+    user_id = Column(GUID(), nullable=False)
     name = Column(String, nullable=False)
     description = Column(Text)
     is_valid = Column(Boolean, default=False)
@@ -60,8 +94,8 @@ class Workflow(Base):
 class WorkflowNode(Base):
     __tablename__ = "workflow_nodes"
     
-    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    workflow_id = Column(UUID(as_uuid=True), ForeignKey("workflows.id", ondelete="CASCADE"))
+    id = Column(GUID(), primary_key=True, default=uuid.uuid4)
+    workflow_id = Column(GUID(), ForeignKey("workflows.id", ondelete="CASCADE"))
     node_id = Column(String, nullable=False)
     node_type = Column(String, nullable=False)  # userQuery, knowledgeBase, llmEngine, output
     position_x = Column(Float, nullable=False)
@@ -74,8 +108,8 @@ class WorkflowNode(Base):
 class WorkflowEdge(Base):
     __tablename__ = "workflow_edges"
     
-    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    workflow_id = Column(UUID(as_uuid=True), ForeignKey("workflows.id", ondelete="CASCADE"))
+    id = Column(GUID(), primary_key=True, default=uuid.uuid4)
+    workflow_id = Column(GUID(), ForeignKey("workflows.id", ondelete="CASCADE"))
     edge_id = Column(String, nullable=False)
     source_node_id = Column(String, nullable=False)
     target_node_id = Column(String, nullable=False)
@@ -86,9 +120,9 @@ class WorkflowEdge(Base):
 class Document(Base):
     __tablename__ = "documents"
     
-    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    workflow_id = Column(UUID(as_uuid=True), ForeignKey("workflows.id", ondelete="CASCADE"))
-    user_id = Column(UUID(as_uuid=True), nullable=False)
+    id = Column(GUID(), primary_key=True, default=uuid.uuid4)
+    workflow_id = Column(GUID(), ForeignKey("workflows.id", ondelete="CASCADE"))
+    user_id = Column(GUID(), nullable=False)
     filename = Column(String, nullable=False)
     file_path = Column(String, nullable=False)
     file_size = Column(Integer)
@@ -102,9 +136,9 @@ class Document(Base):
 class ChatHistory(Base):
     __tablename__ = "chat_history"
     
-    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    workflow_id = Column(UUID(as_uuid=True), ForeignKey("workflows.id", ondelete="CASCADE"))
-    user_id = Column(UUID(as_uuid=True))
+    id = Column(GUID(), primary_key=True, default=uuid.uuid4)
+    workflow_id = Column(GUID(), ForeignKey("workflows.id", ondelete="CASCADE"))
+    user_id = Column(GUID())
     message = Column(Text, nullable=False)
     role = Column(String, nullable=False)  # user, assistant, system
     created_at = Column(DateTime, default=datetime.utcnow)

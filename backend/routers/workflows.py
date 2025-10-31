@@ -31,6 +31,7 @@ class WorkflowCreate(BaseModel):
     user_id: UUID
     nodes: List[NodeCreate] = []
     edges: List[EdgeCreate] = []
+    is_valid: Optional[bool] = False
 
 class WorkflowUpdate(BaseModel):
     name: Optional[str] = None
@@ -45,7 +46,8 @@ async def create_workflow(workflow: WorkflowCreate, db: Session = Depends(get_db
     db_workflow = Workflow(
         user_id=workflow.user_id,
         name=workflow.name,
-        description=workflow.description
+        description=workflow.description,
+        is_valid=workflow.is_valid
     )
     db.add(db_workflow)
     db.commit()
