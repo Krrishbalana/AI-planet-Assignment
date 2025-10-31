@@ -3,14 +3,14 @@ LLM service for interacting with OpenAI, Gemini, and other providers
 """
 import os
 from typing import List, Optional, Dict, Any
-import openai
+from openai import AsyncOpenAI
 # import google.generativeai as genai  # Uncomment when using Gemini
 
 class LLMService:
     def __init__(self):
         self.openai_key = os.getenv("OPENAI_API_KEY")
         self.gemini_key = os.getenv("GEMINI_API_KEY")
-        openai.api_key = self.openai_key
+        self.openai_client = AsyncOpenAI(api_key=self.openai_key) if self.openai_key else None
     
     async def generate(
         self,
@@ -44,6 +44,9 @@ class LLMService:
         context: Optional[List[str]]
     ) -> Dict[str, Any]:
         """Generate response using OpenAI"""
+        if not self.openai_client:
+            raise ValueError("OpenAI API key not configured")
+        
         messages = []
         
         if system_prompt:
@@ -58,7 +61,7 @@ class LLMService:
         
         messages.append({"role": "user", "content": prompt})
         
-        response = await openai.ChatCompletion.acreate(
+        response = await self.openai_client.chat.completions.create(
             model=model,
             messages=messages,
             temperature=temperature,

@@ -7,12 +7,22 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from typing import List, Optional, Dict, Any
 import uvicorn
+import os
+from dotenv import load_dotenv
+
+# Load environment variables
+load_dotenv()
 
 from routers import workflows, documents, chat, llm
-from database import engine, Base
+from database import engine, Base, get_engine_info
 
-# Create database tables
-Base.metadata.create_all(bind=engine)
+# Create database tables with error handling
+try:
+    Base.metadata.create_all(bind=engine)
+    print(f"✅ Database connected successfully: {get_engine_info()}")
+except Exception as e:
+    print(f"⚠️  Database connection issue: {e}")
+    print("Backend will continue but database operations may fail")
 
 app = FastAPI(
     title="Workflow Builder API",
@@ -21,9 +31,10 @@ app = FastAPI(
 )
 
 # Configure CORS
+allowed_origins = os.getenv("CORS_ORIGINS", "http://localhost:8080,http://localhost:5173").split(",")
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:8080"],  # React dev server
+    allow_origins=allowed_origins,  # Frontend dev server
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

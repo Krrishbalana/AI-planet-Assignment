@@ -17,17 +17,21 @@ class VectorStore:
     
     async def create_embeddings(self, texts: List[str]) -> List[List[float]]:
         """Create embeddings using OpenAI"""
-        # Import OpenAI here to avoid circular imports
-        import openai
-        openai.api_key = os.getenv("OPENAI_API_KEY")
+        from openai import AsyncOpenAI
+        
+        api_key = os.getenv("OPENAI_API_KEY")
+        if not api_key:
+            raise ValueError("OPENAI_API_KEY not configured")
+        
+        client = AsyncOpenAI(api_key=api_key)
         
         embeddings = []
         for text in texts:
-            response = await openai.Embedding.acreate(
+            response = await client.embeddings.create(
                 model="text-embedding-ada-002",
                 input=text
             )
-            embeddings.append(response['data'][0]['embedding'])
+            embeddings.append(response.data[0].embedding)
         
         return embeddings
     

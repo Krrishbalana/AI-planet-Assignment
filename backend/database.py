@@ -10,14 +10,35 @@ import uuid
 from datetime import datetime
 import os
 
-DATABASE_URL = os.getenv(
-    "DATABASE_URL",
-    "postgresql://user:password@localhost:5432/workflow_db"
-)
+# Database URL with SQLite fallback for easy development
+DATABASE_URL = os.getenv("DATABASE_URL")
 
-engine = create_engine(DATABASE_URL)
+if not DATABASE_URL:
+    # Default to SQLite for local development
+    DATABASE_URL = "sqlite:///./workflow_db.sqlite"
+    print("ℹ️  No DATABASE_URL found, using SQLite: ./workflow_db.sqlite")
+
+# Create engine with appropriate settings
+if DATABASE_URL.startswith("sqlite"):
+    engine = create_engine(
+        DATABASE_URL,
+        connect_args={"check_same_thread": False},
+        echo=False
+    )
+else:
+    engine = create_engine(DATABASE_URL, echo=False)
+
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 Base = declarative_base()
+
+def get_engine_info() -> str:
+    """Get database engine information"""
+    if DATABASE_URL.startswith("sqlite"):
+        return f"SQLite (local file)"
+    elif DATABASE_URL.startswith("postgresql"):
+        return f"PostgreSQL"
+    else:
+        return f"Database connected"
 
 # Database Models
 class Workflow(Base):
