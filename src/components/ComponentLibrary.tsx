@@ -38,7 +38,7 @@ interface ComponentLibraryProps {
 
 export const ComponentLibrary = ({ onDragStart }: ComponentLibraryProps) => {
   return (
-    <div className="w-64 bg-card border-r border-border p-4 space-y-3">
+    <div className="flex-1 bg-card p-4 space-y-3 overflow-y-auto">
       <h2 className="text-lg font-semibold mb-4 text-foreground">Components</h2>
       {components.map((component) => {
         const Icon = component.icon;

@@ -10,6 +10,8 @@ import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Send, Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { api } from "@/lib/api";
+import { toast } from "sonner";
 
 interface Message {
   id: string;
@@ -36,6 +38,12 @@ export const ChatInterface = ({
   const handleSend = async () => {
     if (!input.trim() || isLoading) return;
 
+    // Temporary user ID (in real app, get from auth)
+    const userId = "00000000-0000-0000-0000-000000000001";
+    
+    // Use provided workflowId or temporary one
+    const effectiveWorkflowId = workflowId || "temp-workflow";
+
     const userMessage: Message = {
       id: Date.now().toString(),
       role: "user",
@@ -47,17 +55,50 @@ export const ChatInterface = ({
     setInput("");
     setIsLoading(true);
 
-    // Simulate AI response (replace with actual API call)
-    setTimeout(() => {
-      const assistantMessage: Message = {
+    try {
+      // Call backend API if we have a real workflow ID
+      if (workflowId && workflowId !== "temp-workflow") {
+        const response = await api.sendMessage({
+          workflow_id: workflowId,
+          user_id: userId,
+          message: userMessage.content,
+        });
+
+        const assistantMessage: Message = {
+          id: (Date.now() + 1).toString(),
+          role: "assistant",
+          content: response.response,
+          timestamp: new Date(),
+        };
+        setMessages((prev) => [...prev, assistantMessage]);
+      } else {
+        // Mock response if no workflow
+        toast.error("Please save your workflow first to enable chat");
+        const assistantMessage: Message = {
+          id: (Date.now() + 1).toString(),
+          role: "assistant",
+          content: "Please build and save a workflow first. Click 'Build Stack' to validate and save your workflow.",
+          timestamp: new Date(),
+        };
+        setMessages((prev) => [...prev, assistantMessage]);
+      }
+    } catch (error) {
+      console.error("Chat error:", error);
+      toast.error(
+        error instanceof Error
+          ? error.message
+          : "Failed to send message. Make sure the backend is running."
+      );
+      const errorMessage: Message = {
         id: (Date.now() + 1).toString(),
         role: "assistant",
-        content: "OpenAI response to: " + userMessage.content,
+        content: "Sorry, I encountered an error. Please make sure the backend server is running on port 8000.",
         timestamp: new Date(),
       };
-      setMessages((prev) => [...prev, assistantMessage]);
+      setMessages((prev) => [...prev, errorMessage]);
+    } finally {
       setIsLoading(false);
-    }, 1500);
+    }
   };
 
   return (

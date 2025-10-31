@@ -16,10 +16,12 @@ import 'reactflow/dist/style.css';
 import { ComponentLibrary } from './ComponentLibrary';
 import { ConfigPanel } from './ConfigPanel';
 import { ChatInterface } from './ChatInterface';
+import { BackendStatus } from './BackendStatus';
 import WorkflowNode, { NodeData } from './WorkflowNode';
 import { Button } from './ui/button';
-import { Play, MessageSquare } from 'lucide-react';
+import { Play, MessageSquare, Save } from 'lucide-react';
 import { toast } from 'sonner';
+import { api } from '@/lib/api';
 
 const nodeTypes = {
   custom: WorkflowNode,
@@ -35,6 +37,8 @@ export const WorkflowBuilder = () => {
   const [reactFlowInstance, setReactFlowInstance] = useState<any>(null);
   const [selectedNode, setSelectedNode] = useState<Node<NodeData> | null>(null);
   const [chatOpen, setChatOpen] = useState(false);
+  const [workflowId, setWorkflowId] = useState<string | null>(null);
+  const [isSaving, setIsSaving] = useState(false);
 
   const onConnect = useCallback(
     (params: Connection) => setEdges((eds) => addEdge(params, eds)),
@@ -135,13 +139,70 @@ export const WorkflowBuilder = () => {
     return true;
   };
 
-  const handleBuildStack = () => {
-    if (validateWorkflow()) {
-      toast.success('Workflow built successfully!');
+  const handleSaveWorkflow = async () => {
+    if (!validateWorkflow()) return;
+
+    setIsSaving(true);
+    try {
+      // Temporary user ID (in real app, get from auth)
+      const userId = "00000000-0000-0000-0000-000000000001";
+      
+      // Transform nodes and edges to API format
+      const apiNodes = nodes.map(node => ({
+        node_id: node.id,
+        node_type: node.data.type,
+        position_x: node.position.x,
+        position_y: node.position.y,
+        config: node.data.config || {},
+      }));
+
+      const apiEdges = edges.map(edge => ({
+        edge_id: edge.id,
+        source_node_id: edge.source,
+        target_node_id: edge.target,
+      }));
+
+      if (workflowId) {
+        // Update existing workflow
+        await api.updateWorkflow(workflowId, {
+          nodes: apiNodes,
+          edges: apiEdges,
+          is_valid: true,
+        });
+        toast.success('Workflow updated successfully!');
+      } else {
+        // Create new workflow
+        const response = await api.createWorkflow({
+          name: `Workflow ${new Date().toLocaleDateString()}`,
+          description: 'AI Workflow',
+          user_id: userId,
+          nodes: apiNodes,
+          edges: apiEdges,
+        });
+        setWorkflowId(response.id);
+        toast.success('Workflow saved successfully!');
+      }
+    } catch (error) {
+      console.error('Save error:', error);
+      toast.error(
+        error instanceof Error
+          ? error.message
+          : 'Failed to save workflow. Make sure the backend is running.'
+      );
+    } finally {
+      setIsSaving(false);
     }
   };
 
+  const handleBuildStack = async () => {
+    await handleSaveWorkflow();
+  };
+
   const handleChatWithStack = () => {
+    if (!workflowId) {
+      toast.error('Please save the workflow first (click Build Stack)');
+      return;
+    }
     if (validateWorkflow()) {
       setChatOpen(true);
     }
@@ -149,15 +210,23 @@ export const WorkflowBuilder = () => {
 
   return (
     <div className="flex h-screen bg-background">
-      <ComponentLibrary onDragStart={onDragStart} />
+      <div className="w-80 border-r border-border flex flex-col">
+        <ComponentLibrary onDragStart={onDragStart} />
+        <div className="p-4 border-t border-border">
+          <BackendStatus />
+        </div>
+      </div>
 
       <div className="flex-1 flex flex-col">
         <div className="h-16 bg-card border-b border-border px-6 flex items-center justify-between">
-          <h1 className="text-xl font-bold text-foreground">Workflow Builder</h1>
+          <h1 className="text-xl font-bold text-foreground">
+            Workflow Builder
+            {workflowId && <span className="text-sm text-muted-foreground ml-2">(Saved)</span>}
+          </h1>
           <div className="flex gap-2">
-            <Button onClick={handleBuildStack} variant="outline">
+            <Button onClick={handleBuildStack} variant="outline" disabled={isSaving}>
               <Play className="w-4 h-4 mr-2" />
-              Build Stack
+              {isSaving ? 'Saving...' : 'Build Stack'}
             </Button>
             <Button onClick={handleChatWithStack}>
               <MessageSquare className="w-4 h-4 mr-2" />
@@ -189,7 +258,11 @@ export const WorkflowBuilder = () => {
 
       <ConfigPanel selectedNode={selectedNode} onConfigChange={onConfigChange} />
 
-      <ChatInterface open={chatOpen} onOpenChange={setChatOpen} />
+      <ChatInterface 
+        open={chatOpen} 
+        onOpenChange={setChatOpen} 
+        workflowId={workflowId || undefined}
+      />
     </div>
   );
 };
